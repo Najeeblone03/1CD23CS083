@@ -216,3 +216,98 @@ As the number of users and notifications increases:
 - `GET /api/notifications` → Fetch notifications for a user.
 - `PUT /api/notifications/{id}/read` → Update notification status.
 - `DELETE /api/notifications/{id}` → Remove a notification from the database.
+# Stage 3
+
+## Query Analysis
+
+Current Query:
+
+```sql
+SELECT *
+FROM notifications
+WHERE studentID = 1042
+AND isRead = false
+ORDER BY createdAt ASC;
+```
+
+### Is this query accurate?
+
+Yes. It fetches all unread notifications for a student ordered by creation time.
+
+### Why is it slow?
+
+- Database contains millions of notifications.
+- `SELECT *` retrieves unnecessary columns.
+- Missing indexes on `studentID`, `isRead`, and `createdAt`.
+- Sorting a large dataset is expensive.
+
+### Better Solution
+
+Create a composite index:
+
+```sql
+CREATE INDEX idx_notifications
+ON notifications(studentID, isRead, createdAt);
+```
+
+Fetch only required columns:
+
+```sql
+SELECT id, title, message, createdAt
+FROM notifications
+WHERE studentID = 1042
+AND isRead = false
+ORDER BY createdAt ASC;
+```
+
+### Should we index every column?
+
+No.
+
+Adding indexes to every column:
+- Increases storage.
+- Slows INSERT and UPDATE operations.
+- Makes database maintenance harder.
+
+Indexes should only be created on frequently searched or sorted columns.
+
+### Query to find placement notifications in the last 7 days
+
+```sql
+SELECT DISTINCT studentID
+FROM notifications
+WHERE notificationType = 'Placement'
+AND createdAt >= CURRENT_DATE - INTERVAL '7 days';
+```
+# Stage 4
+
+## Performance Improvements
+
+To improve notification performance:
+
+1. Use database indexes.
+2. Fetch notifications using pagination (LIMIT and OFFSET).
+3. Cache frequently accessed notifications using Redis.
+4. Load notifications only when required (lazy loading).
+5. Archive old notifications into another table.
+6. Use read replicas for heavy read traffic.
+
+## Trade-offs
+
+| Solution | Advantage | Disadvantage |
+|----------|-----------|--------------|
+| Indexing | Faster search | More storage |
+| Pagination | Faster API | Multiple requests |
+| Redis Cache | Very fast | Extra infrastructure |
+| Read Replicas | Better scalability | Higher cost |
+| Archiving | Smaller active database | More complex queries |
+
+### Recommended Approach
+
+Use:
+- Proper indexes
+- Pagination
+- Redis caching
+- Database replication
+
+These techniques provide good performance even with millions of notifications.
