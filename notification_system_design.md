@@ -311,3 +311,61 @@ Use:
 - Database replication
 
 These techniques provide good performance even with millions of notifications.
+# Stage 5
+
+## Problems with the Current Implementation
+
+The current implementation processes each student one by one.
+
+Issues:
+- If sending an email fails, the loop may stop.
+- Sending emails synchronously is slow for 50,000 users.
+- Database and email operations are tightly coupled.
+- Poor scalability and reliability.
+
+## Improved Solution
+
+- Save the notification to the database first.
+- Push email jobs to a message queue (RabbitMQ/Kafka/AWS SQS).
+- Background workers process email sending asynchronously.
+- Retry failed email jobs automatically.
+- Send in-app notifications independently of email.
+
+## Why save to the DB and send email separately?
+
+Yes, they should be separate.
+
+Benefits:
+- Faster API response.
+- Email failures do not affect notification storage.
+- Better scalability.
+- Easier retry mechanism.
+- Improved fault tolerance.
+
+## Revised Pseudocode
+
+```text
+function notify_all(student_ids, message):
+
+    for each student_id:
+        save_notification_to_database(student_id, message)
+        add_email_job_to_queue(student_id, message)
+        send_in_app_notification(student_id, message)
+
+Background Worker:
+
+while queue is not empty:
+    job = get_next_job()
+    try:
+        send_email(job)
+    catch error:
+        retry(job)
+```
+
+## Advantages
+
+- High performance
+- Reliable delivery
+- Supports large numbers of users
+- Fault tolerant
+- Easy to scale horizontally
